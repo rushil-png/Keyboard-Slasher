@@ -36,3 +36,38 @@ def run(window_size=(1400, 1200)):
 		y = start_y + r * (square_size + row_spacing)
 		for i, ch in enumerate(row):
 			x = start_x + i * (square_size + spacing) + square_size // 2
+			idx = letters.index(ch)
+			letter_positions[idx] = pygame.math.Vector2(int(x), int(y))
+
+	# how close the selector must be to a letter to count as 'at' that letter
+	space_tolerance = max(12, int(square_size * 0.3))
+
+	clock = pygame.time.Clock()
+	font = pygame.font.SysFont(None, int(square_size * 0.6))
+	word_font = pygame.font.SysFont(None, 48)
+
+	# word lists by difficulty
+	easy_words = ["apple", "banana", "cherry", "dragon", "eagle", "forest", "golden", "human", "island", "jungle",
+	              "kitchen", "lemon", "mountain", "numbers", "orange", "purple", "quality", "rainbow", "silver", "tiger",
+	              "umbrella", "violin", "watered", "xylophone", "yellow", "zone", "animal", "bright", "clean", "dream",
+	              "enjoy", "friend", "gentle", "happy", "inside", "journey", "knight", "letter", "magic", "nature",
+	              "outside", "people", "question", "reason", "simple", "teacher", "unique", "village", "window", "zebra",
+	              "keyboard", "typing", "python", "gaming", "music", "coding", "racing", "shader", "render", "pixel"]
+	
+	medium_words = ["algorithm", "bandwagon", "calendar", "dangerous", "excellent", "furniture", "guarantee", "hurricane", "initiative", "jealousy",
+	                "language", "mysterious", "necessary", "operation", "parameter", "rectangle", "separate", "territory", "electricity",
+	                "financial", "generation", "horizontal", "important", "judgment", "liberal", "mathematics", "newspaper", "official", "particular",
+	                "restaurant", "signature", "television", "vacation", "wonderful", "youngster", "zeppelin", "acceptable", "background", "calculation",
+	                "digital", "method", "function", "variable", "string", "number", "boolean", "object", "array", "class",
+	                "interface", "abstract", "public", "private", "static", "final", "super", "this", "else", "switch",
+	                "while", "return", "import", "export", "module", "library", "framework", "package", "compile", "runtime"]
+	
+	hard_words = ["abjure", "abscond", "buzzword", "beguile", "bureaucracy", "cacophony", "callous", "capacity", "carcinogenic",
+	              "carpentry", "catastrophe", "category", "catharsis", "caucasian", "crystallize", "connoisseur", "conscience", "conscientious", "consequence",
+	              "bureaucratic", "complacency", "concatenate", "cryptocurrency", "cyclical", "deleterious", "dexterity", "dichotomy", "diligence", "disquiet",
+	              "dystopian", "eccentricity", "ecclesiastical", "effervescent", "egregious", "encyclopedia", "ephemeral", "equanimity", "esoteric", "ethnography",
+	              "etymology", "euphemism", "felicity", "fervently", "fiduciary", "fluorescent", "frivolous", "functionality", "fundamental", "generosity",
+	              "pseudocholinesterase", "supercalifragilisticexpialidocious", "antidisestablishmentarianism", "incomprehensibility", "dichlorodifluoromethane",
+	              "uncharacteristically", "telecommunications", "disproportionately", "counterrevolutionary", "internationalization",
+	              "subconsciously", "extraterrestrial", "unquestionably", "responsibilities", "characteristics",
+	              "acknowledgements", "accomplishments", "administration", "catastrophically", "chronological"]
