@@ -71,3 +71,37 @@ def run(window_size=(1400, 1200)):
 	              "uncharacteristically", "telecommunications", "disproportionately", "counterrevolutionary", "internationalization",
 	              "subconsciously", "extraterrestrial", "unquestionably", "responsibilities", "characteristics",
 	              "acknowledgements", "accomplishments", "administration", "catastrophically", "chronological"]
+	
+	# select one word from each difficulty
+	current_words = [random.choice(easy_words), random.choice(medium_words), random.choice(hard_words)]
+	word_difficulties = ["easy", "medium", "hard"]
+	word_progress = [0, 0, 0]  # current letter index for each word
+
+	# selector state: position and target 
+	selector_pos = pygame.math.Vector2(cx, cy)
+	target_pos = None
+	# movement/slash timing 
+	slash_dur = 0.22 / 3.0
+	# selector movement will be time-based and matched to slash_dur
+	selector_move_t = 0.0
+	selector_move_dur = 0.0
+	selector_start_pos = selector_pos.copy()
+	selector_speed = 36 * 60
+	# active slash effects
+	slashes = []
+	# word completion mode: completing a word makes the NEXT slash light-blue and duplicated
+	pending_double = False
+	# selector colors
+	green_color = (144, 238, 144)
+	blue_color = (173, 216, 230)
+	red_color = (255, 90, 90)
+	selector_color = green_color
+	# track active blue slashes so we can restore color when done
+	blue_count = 0
+	selected_index = None
+	# queue for buffered key inputs when selector is moving (max 3)
+	input_queue = []
+
+	# BUGFIX: miss flash state - shown briefly when a wrong letter is pressed
+	miss_flash_t = 0.0
+	MISS_FLASH_DUR = 0.25
