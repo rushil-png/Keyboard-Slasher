@@ -212,3 +212,141 @@ def run(window_size=(1400, 1200)):
 						"fade": 0.12,
 						"color": blue_color,
 						"is_blue": True,
+					})
+					# count blue slashes
+					blue_count += 2
+					# reset pending flag (affects only next slash)
+					pending_double = False
+				else:
+					slashes.append({
+						"start": selector_pos.copy(),
+						"end": pygame.math.Vector2(int(tx), int(ty)),
+						"t": 0.0,
+						"dur": slash_dur,
+						# BUGFIX: color a missed letter's slash red instead of the
+						# default green, so hits and misses look different.
+						"color": red_color if missed else green_color,
+					})
+				# start a time-based move matching the slash duration
+				selector_move_t = 0.0
+				selector_move_dur = slash_dur
+				selector_start_pos = selector_pos.copy()
+
+		# Draw keyboard keys at the bottom using precomputed positions (QWERTY layout)
+		for row in kb_rows:
+			for ch in row:
+				idx = letters.index(ch)
+				pos = letter_positions[idx]
+				rect = pygame.Rect(0, 0, square_size, square_size)
+				rect.center = (int(pos.x), int(pos.y))
+				pygame.draw.rect(screen, (255, 255, 255), rect, 3)
+				text_surf = font.render(ch, True, (255, 255, 255))
+				text_rect = text_surf.get_rect(center=rect.center)
+				screen.blit(text_surf, text_rect)
+
+		# Draw words at the top with difficulty colors
+		word_y = 60
+		word_spacing = 80
+		difficulty_colors = {
+			"easy": (144, 200, 100),      # light green
+			"medium": (255, 200, 124),    # orange
+			"hard": (255, 100, 100)       # light red
+		}
+		for wi, word in enumerate(current_words):
+			word_y_pos = word_y + wi * word_spacing
+			difficulty = word_difficulties[wi]
+			color = difficulty_colors.get(difficulty, (200, 200, 200))
+			# display full word in difficulty color
+			word_text = word_font.render(word.upper(), True, color)
+			screen.blit(word_text, (100, word_y_pos))
+			# show progress (highlight typed letters in green)
+			if wi == 0:
+				progress = word_progress[0]
+				prog_text = word_font.render(word[:progress].upper(), True, (144, 238, 144))
+				screen.blit(prog_text, (100, word_y_pos))
+			# display difficulty label
+			diff_text = word_font.render(f"({difficulty})", True, color)
+			screen.blit(diff_text, (100 + len(word) * 30, word_y_pos))
+
+		# BUGFIX: show a brief "MISS" flash near the top when a wrong letter is typed,
+		# on top of the slash itself being colored red, for a clearer miss signal.
+		if miss_flash_t > 0.0:
+			miss_flash_t -= dt
+			alpha = max(0, min(255, int(255 * (miss_flash_t / MISS_FLASH_DUR))))
+			miss_surf = word_font.render("MISS", True, red_color)
+			miss_surf.set_alpha(alpha)
+			screen.blit(miss_surf, (w - 160, 30))
+
+		# update and draw slashes on top of squares (with linger and fade)
+		if slashes:
+			slash_surf = pygame.Surface((w, h), pygame.SRCALPHA)
+			to_remove = []
+			for si, s in enumerate(slashes):
+				s['t'] += dt
+				start = s['start']
+				end = s['end']
+				# skip if scheduled to start later (negative t)
+				if s['t'] < 0:
+					continue
+				# define phases: move -> hold -> fade
+				dur = s.get('dur', 0.22)
+				hold = s.get('hold', 0.12)
+				fade = s.get('fade', 0.12)
+				if s['t'] <= dur:
+					prog = s['t'] / max(1e-6, dur)
+					cur = start + (end - start) * prog
+					alpha = 255
+					width = max(3, int((1.0 - prog) * 14))
+					col = s.get('color', (144, 238, 144))
+					pygame.draw.line(slash_surf, (col[0], col[1], col[2], alpha), (int(start.x), int(start.y)), (int(cur.x), int(cur.y)), width)
+				elif s['t'] <= dur + hold:
+					# full length, hold visible
+					alpha = 255
+					width = 6
+					col = s.get('color', (144, 238, 144))
+					pygame.draw.line(slash_surf, (col[0], col[1], col[2], alpha), (int(start.x), int(start.y)), (int(end.x), int(end.y)), width)
+				elif s['t'] <= dur + hold + fade:
+					# fading out
+					fade_t = s['t'] - (dur + hold)
+					fade_prog = min(1.0, fade_t / max(1e-6, fade))
+					alpha = int(255 * (1.0 - fade_prog))
+					width = max(2, int(6 * (1.0 - fade_prog)))
+					col = s.get('color', (144, 238, 144))
+					pygame.draw.line(slash_surf, (col[0], col[1], col[2], alpha), (int(start.x), int(start.y)), (int(end.x), int(end.y)), width)
+				else:
+					to_remove.append(si)
+			# blit slashes
+			screen.blit(slash_surf, (0, 0))
+			# remove finished (reverse indices)
+			for idx in reversed(to_remove):
+				# if removed slash was blue, decrement counter
+				ss = slashes[idx]
+				if ss.get('is_blue'):
+					blue_count -= 1
+				del slashes[idx]
+			# restore selector color if no active blue slashes
+			if blue_count <= 0:
+				blue_count = 0
+				selector_color = green_color
+
+		# draw selector circle outline on top
+		if selector_pos is not None:
+			selector_radius = max(12, int(square_size / 2) - 6)
+			outline_width = max(4, int(selector_radius * 0.35))
+			col = selector_color
+			pygame.draw.circle(screen, (col[0], col[1], col[2]), (int(selector_pos.x), int(selector_pos.y)), selector_radius, outline_width)
+
+		pygame.display.flip()
+		# BUGFIX: removed the second clock.tick(60) call that used to be here -
+		# dt is already measured from the single tick() call at the top of the loop.
+
+	pygame.quit()
+
+
+if __name__ == "__main__":
+	try:
+		run()
+	except Exception as e:
+		print("Error:", e)
+		pygame.quit()
+		sys.exit(1)
