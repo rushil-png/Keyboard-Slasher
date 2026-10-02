@@ -105,3 +105,110 @@ def run(window_size=(1400, 1200)):
 	# BUGFIX: miss flash state - shown briefly when a wrong letter is pressed
 	miss_flash_t = 0.0
 	MISS_FLASH_DUR = 0.25
+
+	running = True
+	while running:
+		# BUGFIX: clock.tick(60) was being called twice per frame (once here, once
+		# again at the bottom of the loop). Each call can block to cap the frame
+		# rate, so the game was actually running at ~30 real FPS while dt only
+		# measured half of that wait - making every animation (selector movement,
+		# slashes) take about twice as long in real time as intended, and the
+		# input queue (capped at 3) filled up faster than it could drain, so
+		# keystrokes typed at a normal pace were silently dropped.
+		dt = clock.tick(60) / 1000.0
+		for event in pygame.event.get():
+			if event.type == pygame.QUIT:
+				running = False
+			elif event.type == pygame.KEYDOWN:
+				if event.key == pygame.K_ESCAPE:
+					running = False
+				else:
+					# queue all key inputs for processing when selector is idle (max 3)
+					if len(input_queue) < 3:
+						ch = event.unicode.upper()
+						if ch and ch in letters:
+							input_queue.append(('letter', ch))
+
+		screen.fill((0, 0, 0))
+
+		# animate selector towards target if any (time-based, lerp to match slash duration)
+		if target_pos is not None and selector_move_dur > 0.0:
+			selector_move_t += dt
+			prog = min(1.0, selector_move_t / selector_move_dur)
+			selector_pos = selector_start_pos + (target_pos - selector_start_pos) * prog
+			if prog >= 1.0:
+				# movement finished
+				target_pos = None
+				selector_move_dur = 0.0
+				selector_move_t = 0.0
+				# snap selected_index to nearest letter when arrival completes
+				# (helps space detection when selector is slightly off due to floats)
+				nearest = min(range(n), key=lambda i: selector_pos.distance_to(letter_positions[i]))
+				if selector_pos.distance_to(letter_positions[nearest]) <= space_tolerance:
+					selected_index = nearest
+
+		# process queued input when selector is idle
+		if target_pos is None and input_queue:
+			cmd, arg = input_queue.pop(0)
+			if cmd == 'letter':
+				# handle letter: check if it matches the next letter in the current word
+				ch = arg
+				current_word = current_words[0]
+				missed = False
+				if word_progress[0] < len(current_word):
+					next_letter = current_word[word_progress[0]].upper()
+					if ch == next_letter:
+						# correct letter! advance progress
+						word_progress[0] += 1
+						if word_progress[0] >= len(current_word):
+							# word complete! trigger double-slash and get new words
+							pending_double = True
+							selector_color = blue_color
+							# rotate words and reset progress (pick one from each difficulty)
+							current_words.pop(0)
+							word_difficulties.pop(0)
+							diff = random.choice(["easy", "medium", "hard"])
+							if diff == "easy":
+								current_words.append(random.choice(easy_words))
+							elif diff == "medium":
+								current_words.append(random.choice(medium_words))
+							else:
+								current_words.append(random.choice(hard_words))
+							word_difficulties.append(diff)
+							word_progress.pop(0)
+							word_progress.append(0)
+					else:
+						# BUGFIX: wrong letter - flag it so we can show a red flash.
+						# Previously a miss looked identical to a hit (same slash,
+						# same color), so mistakes were invisible.
+						missed = True
+				# always move to the next letter key
+				idx = letters.index(ch)
+				tx = letter_positions[idx].x
+				ty = letter_positions[idx].y
+				target_pos = pygame.math.Vector2(int(tx), int(ty))
+				selected_index = idx
+				if missed:
+					miss_flash_t = MISS_FLASH_DUR
+				# create a quick slash effect from current selector to target
+				if pending_double:
+					# primary blue slash
+					slashes.append({
+						"start": selector_pos.copy(),
+						"end": pygame.math.Vector2(int(tx), int(ty)),
+						"t": 0.0,
+						"dur": slash_dur,
+						"color": blue_color,
+						"is_blue": True,
+					})
+					# schedule duplicate to start after the whole lifecycle (dur+hold+fade)
+					delay = slash_dur + 0.12 + 0.12
+					slashes.append({
+						"start": selector_pos.copy(),
+						"end": pygame.math.Vector2(int(tx), int(ty)),
+						"t": -delay,
+						"dur": slash_dur,
+						"hold": 0.12,
+						"fade": 0.12,
+						"color": blue_color,
+						"is_blue": True,
